@@ -129,16 +129,15 @@ namespace Common
             return landmarks;
         }
 
-        public (Mat, Point2f[] p1, Point2f[] p2) NormalizePosition(Mat src, Rect faceRect,
-            List<IDictionary<FacePart, IEnumerable<FacePoint>>> landmarks = null)
+        public (Mat, Point2f[] p1, Point2f[] p2) NormalizePosition(Mat src, Rect faceRect, IDictionary<FacePart, IEnumerable<FacePoint>> landmarks = null)
         {
             if (landmarks == null)
             {
-                landmarks = GetLandmarks(src);
+                landmarks = GetLandmarks(src).First();
             }
 
             var points = new List<Point>();
-            foreach (var landmark in landmarks.First())
+            foreach (var landmark in landmarks)
             {
                 foreach (var p in landmark.Value.ToArray())
                 {
@@ -148,21 +147,21 @@ namespace Common
 
             var innerEyesAndBottomLip = new int[3];
 
-            var bml = landmarks.First()[FacePart.BottomLip].First(v =>
-                v.Point.X == landmarks.First()[FacePart.BottomLip].ElementAt(0).Point.X);
+            var bml = landmarks[FacePart.BottomLip].First(v =>
+                v.Point.X == landmarks[FacePart.BottomLip].ElementAt(0).Point.X);
             innerEyesAndBottomLip[2] = Enumerable.Select(points, (p, i) => new {p, i})
                 .Where((v, i) => v.p.X == bml.Point.X && v.p.Y == bml.Point.Y)
                 .Select(v => v.i).First();
 
 
-            var el = landmarks.First()[FacePart.LeftEye]
-                .First(v => v.Point.X == landmarks.First()[FacePart.LeftEye].Min(p => p.Point.X));
+            var el = landmarks[FacePart.LeftEye]
+                .First(v => v.Point.X == landmarks[FacePart.LeftEye].Min(p => p.Point.X));
             innerEyesAndBottomLip[0] = Enumerable.Select(points, (p, i) => new {p, i})
                 .Where((v, i) => v.p.X == el.Point.X && v.p.Y == el.Point.Y)
                 .Select(v => v.i).First();
 
-            var er = landmarks.First()[FacePart.RightEye]
-                .First(v => v.Point.X == landmarks.First()[FacePart.RightEye].Max(p => p.Point.X));
+            var er = landmarks[FacePart.RightEye]
+                .First(v => v.Point.X == landmarks[FacePart.RightEye].Max(p => p.Point.X));
             innerEyesAndBottomLip[1] = Enumerable.Select(points, (p, i) => new {p, i})
                 .Where((v, i) => v.p.X == er.Point.X && v.p.Y == er.Point.Y)
                 .Select(v => v.i).First();

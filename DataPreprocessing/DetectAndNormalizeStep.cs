@@ -132,12 +132,10 @@ namespace DataPreprocessing
 
                     if (output != null)
                     {
-                        var (landmarks, rect) = (
-                            new List<IDictionary<FacePart, IEnumerable<FacePoint>>> {output.landmarks},
-                            output.faceRect);
+                        var (landmarks, rect) = (output.landmarks, output.faceRect);
 
                         i++;
-                        var masked = GetMasked(frame, rect, landmarks[0]);
+                        var masked = GetMasked(frame, rect, landmarks);
                         if (masked == null)
                         {
                             Interlocked.Add(ref maskedDropped, 1);

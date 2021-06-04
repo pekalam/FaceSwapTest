@@ -124,16 +124,24 @@ namespace Test
             // SynchronizationContext.SetSynchronizationContext(syncCtx);
 
             var modelDir = @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\faceswap_autoencoder\__saves__";
-            var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model2.pb"));
             var capture = new CaptureService(filePath: @"D:\serena.mp4");
-
-
             var en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
+
+            en.MoveNextAsync().AsTask().GetAwaiter().GetResult();
+            var faceLocation = Cv2.SelectROI(en.Current);
+
+            en.DisposeAsync().GetAwaiter().GetResult();
+            capture = new CaptureService(filePath: @"D:\serena.mp4");
+            en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
+
+            var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model2.pb"), faceLocation);
+
+
             // var en = capture.CaptureFrames(CancellationToken.None, @"D:\nole.mp4").GetAsyncEnumerator();
 
 
 
-            
+
 
             Mat previousFace = null;
             Rect previousRect = Rect.Empty;
@@ -156,7 +164,6 @@ namespace Test
 
                 var (r1, r2, preprocessedOutput) = model.Call(mat);
                 var faceRect = preprocessedOutput.faceRect;
-                var landmarks = preprocessedOutput.landmarks;
                 var target = r2;
                 //var target = r1;
 

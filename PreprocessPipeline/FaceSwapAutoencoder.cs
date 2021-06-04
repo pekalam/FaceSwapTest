@@ -20,8 +20,9 @@ namespace FaceSwapAutoencoder
         private Graph _graph;
         private Session _session;
 
-        public FaceSwapAutoencoder(string graphModelFilePath)
+        public FaceSwapAutoencoder(string graphModelFilePath, Rect? initialFaceLocation = null)
         {
+            Preprocessing = new FaceSwapPreprocessing(initialFaceLocation: initialFaceLocation);
             _graph = new Graph().ImportGraphDef(graphModelFilePath);
 
             _session = tf.Session(_graph);
@@ -34,7 +35,7 @@ namespace FaceSwapAutoencoder
             // }
         }
 
-        public FaceSwapPreprocessing Preprocessing { get; } = new();
+        public FaceSwapPreprocessing Preprocessing { get; }
 
         private (NDArray p1, NDArray p2) CallModel(NDArray image)
         {

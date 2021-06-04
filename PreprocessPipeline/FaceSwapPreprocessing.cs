@@ -84,7 +84,7 @@ public static class A{
 
 namespace FaceSwapAutoencoder
 {
-    public record PreprocessedOutput(NDArray? face, Rect? faceRect, List<IDictionary<FacePart, IEnumerable<FacePoint>>>? landmarks, Point2f[]? p1, Point2f[]? p2);
+    public record PreprocessedOutput(NDArray? face, Rect? faceRect, IDictionary<FacePart, IEnumerable<FacePoint>>? landmarks, Point2f[]? p1, Point2f[]? p2);
 
     public class FaceSwapPreprocessing
     {
@@ -92,25 +92,16 @@ namespace FaceSwapAutoencoder
         private const int ImgHeight = 96;
 
         private readonly HeadPoseNormalization _headPoseNormalization = new();
-        private readonly HcFaceDetection _faceDetection = new(new HcFaceDetectionSettings());
-        private ArrayPool<byte> _memoryPool;
         private Mat _resizedMat;
         private bool _normalize = true;
+        private AccurateFaceDetection _faceDetection;
 
-        public FaceSwapPreprocessing(bool normalize = true)
+        public FaceSwapPreprocessing(bool normalize = true, Rect? initialFaceLocation = null)
         {
+            _faceDetection = new AccurateFaceDetection(new ConsoleLogger(), initialFaceLocation);
             _normalize = normalize;
-            _memoryPool = ArrayPool<byte>.Shared;
             SharedFaceRecognitionModel.Init(new FaceRecognitionModelSettings());
             _resizedMat = Mat.Zeros(ImgHeight, ImgWidth, MatType.CV_8UC3);
-        }
-
-        private Image LoadImage(Mat photo)
-        {
-            var buffer = _memoryPool.Rent(photo.Rows * photo.Cols * photo.ElemSize());
-            Marshal.Copy(photo.Data, buffer, 0, buffer.Length);
-            var img = FaceRecognition.LoadImage(buffer, photo.Rows, photo.Cols, photo.ElemSize(), Mode.Rgb);
-            return img;
         }
 
         public Mat InverseAffine(NDArray modelOutput, PreprocessedOutput preprocessedOutput)
@@ -146,64 +137,11 @@ namespace FaceSwapAutoencoder
             return mat;
         }
 
-        private Rect SelectRect(Rect[] rects, List<IDictionary<FacePart, IEnumerable<FacePoint>>> landmarks)
-        {
-            var rect = rects.OrderBy(v1 => v1.Width * v1.Height).Last();
-            return rect;
-        }
-        
-        private Rect SelectRect2(Rect[] rects, List<IDictionary<FacePart, IEnumerable<FacePoint>>> landmarks)
-        {
-            var consideredFaceParts = new[]
-                {FacePart.LeftEye, FacePart.RightEye, FacePart.TopLip, FacePart.LeftEyebrow, FacePart.RightEyebrow};
-            var selectedRects = new List<Rect>();
-
-            foreach (var landmark in landmarks.Where(l => l.Keys.Intersect(consideredFaceParts).All(consideredFaceParts.Contains)))
-            {
-                foreach (var rect in rects)
-                {
-                    var contains = true;
-                    foreach (var (k, v) in landmark.Where((kv) => consideredFaceParts.Contains(kv.Key)))
-                    {
-                        if (!v.All(p => rect.Contains(p.Point.X, p.Point.Y)))
-                        {
-                            contains = false;
-                            break;
-                        }
-                    }
-
-                    if (contains && !selectedRects.Contains(rect))
-                    {
-                        selectedRects.Add(rect);
-                    }
-                }
-            }
-
-            selectedRects.Sort((v1, v2) => v1.Width * v1.Height <= v2.Width * v2.Height ? -1 : 1);
-            if (selectedRects.Count == 0)
-            {
-                return Rect.Empty;
-            }
-            return selectedRects[^1];
-        }
-
         public PreprocessedOutput Preprocess(Mat photo)
         {
-            var rects = _faceDetection.DetectFrontalThenProfileFaces(photo);
-            if (rects.Length == 0)
-            {
-                return new(null, null, null, null,null);
-            }
+            var faceDetectionOut = _faceDetection.DetectFace(photo);
 
-            var landmarks = SharedFaceRecognitionModel.Model
-                .FaceLandmark(LoadImage(photo)).ToList();
-            if (landmarks.Count == 0)
-            {
-                return new(null, null, null, null, null);
-            }
-
-            var rect = SelectRect2(rects, landmarks);
-            if (rect == Rect.Empty)
+            if (faceDetectionOut == null)
             {
                 return new(null, null, null, null, null);
             }
@@ -212,11 +150,11 @@ namespace FaceSwapAutoencoder
             Point2f[]? p1 = null, p2 = null;
             if (_normalize)
             {
-                (normalized,p1,p2) = _headPoseNormalization.NormalizePosition(photo, rect, landmarks);
+                (normalized,p1,p2) = _headPoseNormalization.NormalizePosition(photo, faceDetectionOut.faceRect, faceDetectionOut.landmarks);
             }
             else
             {
-                normalized = new Mat(photo, rect);
+                normalized = new Mat(photo, faceDetectionOut.faceRect);
             }
 
             Cv2.Resize(normalized, _resizedMat, new Size(ImgWidth, ImgHeight));
@@ -228,7 +166,7 @@ namespace FaceSwapAutoencoder
             //Cv2.WaitKey();
 
             var npNormalized = np.array(buffer, np.uint8).astype(np.float32).reshape(96,96,3);
-            return new(npNormalized, rect, landmarks, p1,p2);
+            return new(npNormalized, faceDetectionOut.faceRect, faceDetectionOut.landmarks, p1,p2);
         }
     }
 
