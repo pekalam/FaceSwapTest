@@ -137,13 +137,23 @@ namespace FaceSwapAutoencoder
             return mat;
         }
 
-        public PreprocessedOutput? Preprocess(Mat photo)
+        public PreprocessedOutput? Preprocess(Mat photo, bool masked = false)
         {
             var faceDetectionOut = _faceDetection.DetectFace(photo);
 
             if (faceDetectionOut == null)
             {
                 return null;
+            }
+
+            if (masked)
+            {
+                var maskedImg = MaskUtils.GetMasked(photo, faceDetectionOut.landmarks);
+                if (maskedImg == null)
+                {
+                    return null;
+                }
+                photo = maskedImg;
             }
 
             Mat normalized;

@@ -52,9 +52,9 @@ namespace FaceSwapAutoencoder
             return (result_p1, result_p2);
         }
 
-        public Output? Call(Mat image)
+        public Output? Call(Mat image, bool masked = false)
         {
-            var preprocessed = Preprocessing.Preprocess(image);
+            var preprocessed = Preprocessing.Preprocess(image, masked);
 
 
             if (preprocessed == null)

@@ -57,48 +57,6 @@ namespace DataPreprocessing
             return (readFrames, path);
         }
 
-        private Mat? GetMasked(Mat img, Rect rect, IDictionary<FacePart, IEnumerable<FacePoint>> landmark)
-        {
-            var lChin = landmark[FacePart.Chin]
-                .First(v => v.Index == 0).Point;
-            var c = new List<Point>();
-
-            c.Add(new Point(lChin.X, lChin.Y));
-
-            foreach (var el in landmark[FacePart.LeftEyebrow].Where(v => v.Index < 20))
-            {
-                c.Add(new Point(el.Point.X, el.Point.Y));
-            }
-
-            foreach (var el in landmark[FacePart.RightEyebrow].Where(v => v.Index >= 24))
-            {
-                c.Add(new Point(el.Point.X, el.Point.Y));
-            }
-
-            if (landmark[FacePart.Chin].Max(v => v.Point.Y) < 96 - 6)
-            {
-                return null;
-            }
-
-            foreach (var el in landmark[FacePart.Chin].Reverse())
-            {
-                var cpt = new Point(el.Point.X, el.Point.Y);
-                c.Add(cpt);
-            }
-
-            var newImg = img.Clone();
-            newImg.SetTo(Scalar.Black);
-            Point[][] contours = new Point[][]
-            {
-                c.ToArray()
-            };
-            Cv2.DrawContours(newImg, contours, 0, Scalar.White, -1);
-            img.CopyTo(newImg, newImg);
-
-
-            return newImg;
-        }
-
         public void StepFunc((FrameReadStep.ReadFrame[] readFrames, string faceQNetPath) args)
         {
             AccurateFaceDetection accDetect = null;
@@ -135,7 +93,7 @@ namespace DataPreprocessing
                         var (landmarks, rect) = (output.landmarks, output.faceRect);
 
                         i++;
-                        var masked = GetMasked(frame, rect, landmarks);
+                        var masked = MaskUtils.GetMasked(frame, landmarks);
                         if (masked == null)
                         {
                             Interlocked.Add(ref maskedDropped, 1);
