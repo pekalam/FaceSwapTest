@@ -20,6 +20,8 @@ namespace FaceSwapAutoencoder
         private Graph _graph;
         private Session _session;
 
+        public record Output(NDArray p1, NDArray p2, PreprocessedOutput preprocessedOutput);
+
         public FaceSwapAutoencoder(string graphModelFilePath, Rect? initialFaceLocation = null)
         {
             Preprocessing = new FaceSwapPreprocessing(initialFaceLocation: initialFaceLocation);
@@ -50,21 +52,21 @@ namespace FaceSwapAutoencoder
             return (result_p1, result_p2);
         }
 
-        public (NDArray? p1, NDArray? p2, PreprocessedOutput preprocessedOutput) Call(Mat image)
+        public Output? Call(Mat image)
         {
             var preprocessed = Preprocessing.Preprocess(image);
 
 
-            if (preprocessed.face == null)
+            if (preprocessed == null)
             {
-                return (null, null, preprocessed);
+                return null;
             }
 
             var (p1, p2) = CallModel(preprocessed.face!);
 
             //Preprocessing.InverseAffine(np.squeeze(p2*255.0f), preprocessed);
 
-            return (p1, p2, preprocessed);
+            return new(p1, p2, preprocessed);
         }
 
         public void Dispose()

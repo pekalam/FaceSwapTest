@@ -84,7 +84,7 @@ public static class A{
 
 namespace FaceSwapAutoencoder
 {
-    public record PreprocessedOutput(NDArray? face, Rect? faceRect, IDictionary<FacePart, IEnumerable<FacePoint>>? landmarks, Point2f[]? p1, Point2f[]? p2);
+    public record PreprocessedOutput(NDArray face, Rect faceRect, IDictionary<FacePart, IEnumerable<FacePoint>> landmarks, Point2f[] p1, Point2f[] p2);
 
     public class FaceSwapPreprocessing
     {
@@ -117,10 +117,10 @@ namespace FaceSwapAutoencoder
 
             for (int i = 0; i < preprocessedOutput.p1.Length; i++)
             {
-                p1[i] = new Point2f((preprocessedOutput.p1[i].X - preprocessedOutput.faceRect.Value.X) * (96.0f / preprocessedOutput.faceRect.Value.Width),
-                    (preprocessedOutput.p1[i].Y - preprocessedOutput.faceRect.Value.Y) * (96.0f / preprocessedOutput.faceRect.Value.Height));
-                p2[i] = new Point2f(preprocessedOutput.p2[i].X * (96.0f / preprocessedOutput.faceRect.Value.Width),
-                    preprocessedOutput.p2[i].Y * (96.0f / preprocessedOutput.faceRect.Value.Height));
+                p1[i] = new Point2f((preprocessedOutput.p1[i].X - preprocessedOutput.faceRect.X) * (96.0f / preprocessedOutput.faceRect.Width),
+                    (preprocessedOutput.p1[i].Y - preprocessedOutput.faceRect.Y) * (96.0f / preprocessedOutput.faceRect.Height));
+                p2[i] = new Point2f(preprocessedOutput.p2[i].X * (96.0f / preprocessedOutput.faceRect.Width),
+                    preprocessedOutput.p2[i].Y * (96.0f / preprocessedOutput.faceRect.Height));
             }
 
             var h = Cv2.GetAffineTransform(p2, p1);
@@ -137,13 +137,13 @@ namespace FaceSwapAutoencoder
             return mat;
         }
 
-        public PreprocessedOutput Preprocess(Mat photo)
+        public PreprocessedOutput? Preprocess(Mat photo)
         {
             var faceDetectionOut = _faceDetection.DetectFace(photo);
 
             if (faceDetectionOut == null)
             {
-                return new(null, null, null, null, null);
+                return null;
             }
 
             Mat normalized;
