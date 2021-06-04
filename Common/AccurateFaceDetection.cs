@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using FaceRecognitionDotNet;
+using FaceRecognitionDotNet.Extensions;
 using HDF.PInvoke;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -145,6 +146,18 @@ namespace Common
             var smallerArea = CalcArea(selected.Rect) < _avgArea / 2.0;
             var biggerArea = CalcArea(selected.Rect) > _avgArea * 1.5;
 
+            Console.WriteLine($"Avg: {_avgArea} sel: {CalcArea(selected.Rect)}");
+
+            //is smaller than previous
+            if (!smallerArea && _attractingRoi.HasValue)
+            {
+                smallerArea = CalcArea(selected.Rect) < CalcArea(_attractingRoi.Value) / 2.0;
+            }
+            if (!biggerArea && _attractingRoi.HasValue)
+            {
+                biggerArea = CalcArea(selected.Rect) > CalcArea(_attractingRoi.Value) * 1.5;
+            }
+
             if (_attractingRoi.HasValue)
             {
                 topCandidates = topCandidates.Where(c => IntersectWith(c.Rect, _attractingRoi.Value)).ToArray();
@@ -154,7 +167,7 @@ namespace Common
             {
                 _logger.LogDebug("Selecting another rect due to bigger area value");
 
-                var newSelected = topCandidates.FirstOrDefault(arg => CalcArea(arg.Rect) < _avgArea * 1.5);
+                var newSelected = topCandidates.FirstOrDefault(arg => CalcArea(arg.Rect) < _avgArea * 1.5 && CalcArea(arg.Rect) > _avgArea / 2.0);
                 return newSelected;
             }
 
@@ -162,7 +175,7 @@ namespace Common
             {
                 _logger.LogDebug("Selecting another rect due to smaller area value");
 
-                var newSelected = topCandidates.FirstOrDefault(arg => CalcArea(arg.Rect) > _avgArea / 2.0);
+                var newSelected = topCandidates.FirstOrDefault(arg => CalcArea(arg.Rect) > _avgArea / 2.0 && CalcArea(arg.Rect) < _avgArea * 1.5);
                 return newSelected;
             }
 
@@ -245,9 +258,24 @@ namespace Common
             }
 
             var output = new FaceDetectionOutput(selected.Rect, GetFaceCoords(selected.Landmarks), selected.Landmarks);
-            SetPreviousOutput(output);
             return output;
         }
+
+        /// <summary>
+        /// Info only
+        /// </summary>
+        // private void CompareWithPrevious(FaceDetectionOutput output)
+        // {
+        //     if (_prevOutput == null)
+        //     {
+        //         return;
+        //     }
+        //
+        //     var currentPose = _recog.PredictHeadPose(output.landmarks);
+        //     var prevPose = _recog.PredictHeadPose(_prevOutput.landmarks);
+        //
+        //     Console.WriteLine($"yaw diff: {Math.Abs(currentPose.Yaw - prevPose.Yaw)}");
+        // }
 
         public FaceDetectionOutput? DetectFace(Mat image)
         {
@@ -276,6 +304,7 @@ namespace Common
                 return _prevOutput;
             }
 
+            SetPreviousOutput(output);
             return output;
         }
 
