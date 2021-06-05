@@ -118,6 +118,25 @@ namespace Test
             return ret;
         }
 
+        static void SeamlessClone(Mat missingMask, Mat faceAfter, Mat orgFaceCpy, Mat result)
+        {
+            Cv2.BitwiseNot(missingMask, missingMask);
+            Cv2.FindContours(missingMask, out var contours, out var _, RetrievalModes.External,
+                ContourApproximationModes.ApproxNone);
+            var topBoundingRect = contours.Select(Cv2.BoundingRect).OrderByDescending(r => r.Width * r.Height).First();
+            var topContour = contours.First(c => Cv2.BoundingRect((IEnumerable<Point>) c) == topBoundingRect);
+            using var bestMask = Mat.Zeros(missingMask.Size(), missingMask.Type()).ToMat();
+            Cv2.DrawContours(bestMask, new List<IEnumerable<Point>>() { topContour }, -1, new Scalar(255, 255, 255), Cv2.FILLED);
+            // Cv2.ImShow("src", bestMask2);
+            // Cv2.WaitKey();
+            var center = new Point(topBoundingRect.X + topBoundingRect.Width / 2,
+                topBoundingRect.Y + topBoundingRect.Height / 2);
+            // Cv2.ImShow("dst", orgFaceCpy);
+            // Cv2.WaitKey();
+
+            Cv2.SeamlessClone(faceAfter, orgFaceCpy, bestMask, center, result, SeamlessCloneMethods.NormalClone);
+        }
+
         static async Task Main(string[] args)
         {
             // var syncCtx = new CustomSynchronizationContext();
@@ -149,6 +168,7 @@ namespace Test
             FaceSwapAutoencoder.FaceSwapAutoencoder.Output prevOutput = null;
             int p = 0;
 
+            bool useSeamlessClone = true;
             bool writeFile = false;
             VideoWriter? writer = null;
 
@@ -195,13 +215,26 @@ namespace Test
                 Cv2.CvtColor(output, gray, ColorConversionCodes.BGR2GRAY);
                 Cv2.Threshold(gray, missingMask, 0, 255, ThresholdTypes.BinaryInv);
 
-                Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 16.0);
 
-                //missing part
-                orgFace.CopyTo(output, missingMask);
+                if (useSeamlessClone)
+                {
+                    //missing 
+                    orgFace.CopyTo(output, missingMask);
+                    //copy face
+                    output.CopyTo(orgFace);
 
-                //copy face
-                output.CopyTo(new Mat(mat, faceRect));
+                    SeamlessClone(missingMask, orgFace, orgFaceCpy, orgFaceCpy);
+                    orgFaceCpy.CopyTo(orgFace);
+                }
+                else
+                {
+                    Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 16.0);
+                    //missing 
+                    orgFace.CopyTo(output, missingMask);
+                    //copy face
+                    output.CopyTo(orgFace);
+                }
+
 
                 prevOutput = modelOut;
 
