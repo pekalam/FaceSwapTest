@@ -175,32 +175,33 @@ namespace Test
                 Debug.Assert(modelOut != null);
                 var (r1, r2, preprocessedOutput) = modelOut;
                 var faceRect = preprocessedOutput.faceRect;
-                var target = r2;
+                var target = r1;
                 //var target = r1;
 
-                using var face = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
-                Cv2.CvtColor(face, face, ColorConversionCodes.RGB2BGR);
-                face.ConvertTo(face, MatType.CV_8UC3);
-                Cv2.Resize(face, face, new Size(faceRect.Width, faceRect.Height), interpolation: InterpolationFlags.Lanczos4);
+                using var output = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
+                Cv2.CvtColor(output, output, ColorConversionCodes.RGB2BGR);
+                output.ConvertTo(output, MatType.CV_8UC3);
+                Cv2.Resize(output, output, new Size(faceRect.Width, faceRect.Height), interpolation: InterpolationFlags.Lanczos4);
+
+                using var orgOutput = output.Clone();
                 using var orgFace = new Mat(mat, faceRect);
                 using var orgFaceCpy = orgFace.Clone();
 
-                using var missingMask = Mat.Zeros(face.Size(), MatType.CV_8U).ToMat();
+                using var missingMask = Mat.Zeros(output.Size(), MatType.CV_8U).ToMat();
                 //Cv2.BitwiseNot(missingMask, missingMask);
 
 
                 using var gray = new Mat();
-                Cv2.CvtColor(face, gray, ColorConversionCodes.BGR2GRAY);
+                Cv2.CvtColor(output, gray, ColorConversionCodes.BGR2GRAY);
                 Cv2.Threshold(gray, missingMask, 0, 255, ThresholdTypes.BinaryInv);
 
                 Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 16.0);
 
-                orgFace.CopyTo(face, missingMask);
+                //missing part
+                orgFace.CopyTo(output, missingMask);
+
                 //copy face
-                face.CopyTo(new Mat(mat, faceRect));
-
-
-
+                output.CopyTo(new Mat(mat, faceRect));
 
                 prevOutput = modelOut;
 
@@ -209,7 +210,7 @@ namespace Test
                 orgFaceCpy.CopyTo(new Mat(mat, orgPreviewRect));
                 orgPreviewRect.Y += orgPreviewRect.Height;
 
-                face.CopyTo(new Mat(mat, orgPreviewRect));
+                orgOutput.CopyTo(new Mat(mat, orgPreviewRect));
 
                 Cv2.ImShow("frame", mat);
                 Cv2.WaitKey(5);
