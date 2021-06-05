@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -146,7 +146,7 @@ namespace Common
             var smallerArea = CalcArea(selected.Rect) < _avgArea / 2.0;
             var biggerArea = CalcArea(selected.Rect) > _avgArea * 1.5;
 
-            Console.WriteLine($"Avg: {_avgArea} sel: {CalcArea(selected.Rect)}");
+            // Console.WriteLine($"Avg: {_avgArea} sel: {CalcArea(selected.Rect)}");
 
             //is smaller than previous
             if (!smallerArea && _attractingRoi.HasValue)
@@ -277,24 +277,34 @@ namespace Common
         //     Console.WriteLine($"yaw diff: {Math.Abs(currentPose.Yaw - prevPose.Yaw)}");
         // }
 
-        public FaceDetectionOutput? DetectFace(Mat image)
+        public FaceDetectionOutput? DetectFace(Mat image, bool cnnFirst = false)
         {
-            var rects = _hc.DetectFrontalThenProfileFaces(image);
-
             if (!bufInitialized)
             {
                 buff = new byte[image.Rows * image.Cols * image.ElemSize()];
                 bufInitialized = true;
             }
-
             using var dnImage = LoadImage(image, buff);
+
+            Rect[] HcDetect()
+            {
+                return _hc.DetectFrontalThenProfileFaces(image);
+            }
+
+            Rect[] CnnDetect()
+            {
+                return _recog.FaceLocations(dnImage)
+                    .Select(v => new Rect(v.Left, v.Top, v.Right - v.Left, v.Bottom - v.Top)).ToArray();
+            }
+
+            var rects = cnnFirst ? CnnDetect() : HcDetect();
+
             var output = DetectFacesFromRects(image, dnImage, rects);
 
             if (output == null)
             {
-                _logger.LogWarning("Falling back to CNN detector");
-                rects = _recog.FaceLocations(dnImage)
-                    .Select(v => new Rect(v.Left, v.Top, v.Right - v.Left, v.Bottom - v.Top)).ToArray();
+                _logger.LogWarning($"Falling back to {(cnnFirst ? "CNN" : "HC")} detector");
+                rects = cnnFirst ? HcDetect() : CnnDetect();
                 output = DetectFacesFromRects(image, dnImage, rects);
             }
 
@@ -311,6 +321,7 @@ namespace Common
         public void Dispose()
         {
             _hc.Dispose();
+            _recog.Dispose();
         }
     }
 }

@@ -127,14 +127,16 @@ namespace Test
             //var modelDir = @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\faceswap_autoencoder\__saves__";
             var modelDir =
                 @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\FaceSwapAutoencoder_from_template\__saves__";
-            var capture = new CaptureService(filePath: @"D:\serena.mp4");
+            var capture = new CaptureService(filePath: @"D:\nole.mp4");
             var en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
 
             en.MoveNextAsync().AsTask().GetAwaiter().GetResult();
+
+            var frameSz = en.Current.Size();
             var faceLocation = Cv2.SelectROI(en.Current);
 
             en.DisposeAsync().GetAwaiter().GetResult();
-            capture = new CaptureService(filePath: @"D:\serena.mp4");
+            capture = new CaptureService(filePath: @"D:\nole.mp4");
             en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
 
             // var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model2.pb"), faceLocation);
@@ -147,13 +149,17 @@ namespace Test
             FaceSwapAutoencoder.FaceSwapAutoencoder.Output prevOutput = null;
             int p = 0;
 
-            bool seamlessClone = true;
+            bool writeFile = false;
+            VideoWriter? writer = null;
 
+            if(writeFile) writer = new VideoWriter("output.avi", FourCC.MJPG, 25, frameSz);
+
+            var totalFrames = capture.TotalFrames;
             while (true)
             {
                 var t = en.MoveNextAsync();
                 t.AsTask().GetAwaiter().GetResult();
-                var mat = en.Current;
+                using var mat = en.Current;
 
                 p++;
                 if (p < 370)
@@ -172,70 +178,29 @@ namespace Test
                 var target = r2;
                 //var target = r1;
 
-                var face = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
+                using var face = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
                 Cv2.CvtColor(face, face, ColorConversionCodes.RGB2BGR);
                 face.ConvertTo(face, MatType.CV_8UC3);
                 Cv2.Resize(face, face, new Size(faceRect.Width, faceRect.Height), interpolation: InterpolationFlags.Lanczos4);
-                var orgFace = new Mat(mat, faceRect);
-                var orgFaceCpy = orgFace.Clone();
+                using var orgFace = new Mat(mat, faceRect);
+                using var orgFaceCpy = orgFace.Clone();
 
-                var mask = Mat.Ones(face.Size(), MatType.CV_8U).ToMat();
-                var missingMask = Mat.Zeros(face.Size(), MatType.CV_8U).ToMat();
+                using var missingMask = Mat.Zeros(face.Size(), MatType.CV_8U).ToMat();
                 //Cv2.BitwiseNot(missingMask, missingMask);
 
-                Cv2.ImShow("face", face);
-                Cv2.WaitKey(1);
 
-                var gray = new Mat();
+                using var gray = new Mat();
                 Cv2.CvtColor(face, gray, ColorConversionCodes.BGR2GRAY);
                 Cv2.Threshold(gray, missingMask, 0, 255, ThresholdTypes.BinaryInv);
 
-                Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 11.0);
+                Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 16.0);
 
-                Cv2.BitwiseNot(missingMask, missingMask);
-                Cv2.ImShow("miss", missingMask);
-                Cv2.WaitKey(1);
-
-                var center = new Point(faceRect.Width / 2, faceRect.Height / 2);
-
-
-                for (int i = 0; i < preprocessedOutput.p2.Length; i++)
-                {
-                    preprocessedOutput.p2[i].X += faceRect.X;
-                    preprocessedOutput.p2[i].Y += faceRect.Y;
-                }
-
-                var m = orgFace.Clone();
-                Cv2.SeamlessClone(face, orgFace, null, center, m, SeamlessCloneMethods.NormalClone);
-                Cv2.ImShow("miss", m);
-                Cv2.WaitKey(1);
-                //orgFace.CopyTo(face, missingMask);
-
-
-
-                m.CopyTo(orgFace);
-
-
-
+                orgFace.CopyTo(face, missingMask);
                 //copy face
-                if (!seamlessClone)
-                {
-                    face.CopyTo(new Mat(mat, faceRect));
-                }
+                face.CopyTo(new Mat(mat, faceRect));
 
-                try
-                {
-                    if (seamlessClone)
-                    {
-                 
-                        //Cv2.SeamlessClone(face, mat, null, center, mat, SeamlessCloneMethods.NormalClone);
-                    }
-                }
-                catch (OpenCVException e)
-                {
-                    Console.WriteLine(e);
-                    continue;
-                }
+
+
 
                 prevOutput = modelOut;
 
@@ -248,6 +213,12 @@ namespace Test
 
                 Cv2.ImShow("frame", mat);
                 Cv2.WaitKey(5);
+
+                if (writeFile)
+                {
+                    writer.Write(mat);
+                }
+                Console.WriteLine($"{p}/{totalFrames}");
             }
         }
     }

@@ -98,7 +98,7 @@ namespace FaceSwapAutoencoder
 
         public FaceSwapPreprocessing(bool normalize = true, Rect? initialFaceLocation = null)
         {
-            _faceDetection = new AccurateFaceDetection(new ConsoleLogger(), initialFaceLocation);
+            _faceDetection = new AccurateFaceDetection(attractingRoi: initialFaceLocation);
             _normalize = normalize;
             SharedFaceRecognitionModel.Init(new FaceRecognitionModelSettings());
             _resizedMat = Mat.Zeros(ImgHeight, ImgWidth, MatType.CV_8UC3);
