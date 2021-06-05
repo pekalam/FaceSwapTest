@@ -124,7 +124,9 @@ namespace Test
             //TODO use async enum in console app
             // SynchronizationContext.SetSynchronizationContext(syncCtx);
 
-            var modelDir = @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\faceswap_autoencoder\__saves__";
+            //var modelDir = @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\faceswap_autoencoder\__saves__";
+            var modelDir =
+                @"C:\Users\Marek\source\repos\DeepLearning\FaceSwapProject\FaceSwapAutoencoder_from_template\__saves__";
             var capture = new CaptureService(filePath: @"D:\serena.mp4");
             var en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
 
@@ -135,7 +137,8 @@ namespace Test
             capture = new CaptureService(filePath: @"D:\serena.mp4");
             en = capture.CaptureFrames(CancellationToken.None).GetAsyncEnumerator();
 
-            var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model2.pb"), faceLocation);
+            // var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model2.pb"), faceLocation);
+            var model = new FaceSwapAutoencoder.FaceSwapAutoencoder(Path.Combine(modelDir, "model_masked1.pb"), faceLocation);
 
 
             // var en = capture.CaptureFrames(CancellationToken.None, @"D:\nole.mp4").GetAsyncEnumerator();
@@ -144,7 +147,7 @@ namespace Test
             FaceSwapAutoencoder.FaceSwapAutoencoder.Output prevOutput = null;
             int p = 0;
 
-            bool seamlessClone = false;
+            bool seamlessClone = true;
 
             while (true)
             {
@@ -158,7 +161,7 @@ namespace Test
                     //continue;
                 }
 
-                var modelOut = model.Call(mat);
+                var modelOut = model.Call(mat, true);
                 if (modelOut == null)
                 {
                     modelOut = prevOutput;
@@ -169,27 +172,32 @@ namespace Test
                 var target = r2;
                 //var target = r1;
 
-                Mat wMat;
-                wMat = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
-                Cv2.CvtColor(wMat, wMat, ColorConversionCodes.RGB2BGR);
-                wMat.ConvertTo(wMat, MatType.CV_8UC3);
-                Cv2.Resize(wMat, wMat, new Size(faceRect.Width, faceRect.Height));
-                var orgFace = new Mat(mat, faceRect).Clone();
+                var face = model.Preprocessing.InverseAffine(np.squeeze(target * 255.0f), preprocessedOutput);
+                Cv2.CvtColor(face, face, ColorConversionCodes.RGB2BGR);
+                face.ConvertTo(face, MatType.CV_8UC3);
+                Cv2.Resize(face, face, new Size(faceRect.Width, faceRect.Height), interpolation: InterpolationFlags.Lanczos4);
+                var orgFace = new Mat(mat, faceRect);
+                var orgFaceCpy = orgFace.Clone();
 
-                //Cv2.CvtColor(mat, mat, ColorConversionCodes.BGR2BGRA);
+                var mask = Mat.Ones(face.Size(), MatType.CV_8U).ToMat();
+                var missingMask = Mat.Zeros(face.Size(), MatType.CV_8U).ToMat();
+                //Cv2.BitwiseNot(missingMask, missingMask);
 
-                var warped = wMat.Clone();
-                Cv2.CvtColor(warped, warped, ColorConversionCodes.BGR2GRAY);
-                Cv2.FindContours(warped, out var contours, out var _, RetrievalModes.External, ContourApproximationModes.ApproxNone);
+                Cv2.ImShow("face", face);
+                Cv2.WaitKey(1);
 
-                var mask = Mat.Zeros(wMat.Size(), MatType.CV_8U).ToMat();
-                Cv2.DrawContours(mask, contours, 0, new Scalar(255), -1);
+                var gray = new Mat();
+                Cv2.CvtColor(face, gray, ColorConversionCodes.BGR2GRAY);
+                Cv2.Threshold(gray, missingMask, 0, 255, ThresholdTypes.BinaryInv);
 
-                Cv2.Erode(mask, mask, new Mat()); 
-                //wMat.CopyTo(new Mat(mat, selectedRect), mask);
+                Cv2.GaussianBlur(missingMask, missingMask, new Size(9, 9), 11.0);
 
-                var center = new Point(faceRect.X + faceRect.Width / 2,
-                    faceRect.Y + faceRect.Height / 2);
+                Cv2.BitwiseNot(missingMask, missingMask);
+                Cv2.ImShow("miss", missingMask);
+                Cv2.WaitKey(1);
+
+                var center = new Point(faceRect.Width / 2, faceRect.Height / 2);
+
 
                 for (int i = 0; i < preprocessedOutput.p2.Length; i++)
                 {
@@ -197,54 +205,30 @@ namespace Test
                     preprocessedOutput.p2[i].Y += faceRect.Y;
                 }
 
-                var h = Cv2.GetAffineTransform(preprocessedOutput.p2, preprocessedOutput.p1);
-                var m1 = Mat.FromArray(center.X, center.Y, 1);
-                m1.ConvertTo(m1, MatType.CV_64F);
-
-                var ap = h.Multiply(m1).ToMat();
-                var maskCenter = new Point((float)ap.At<double>(0, 0),(float) ap.At<double>(0, 1));
-
-                // center.X = (int)ap.At<double>(0, 0);
-                // center.Y = (int)ap.At<double>(0, 1);
+                var m = orgFace.Clone();
+                Cv2.SeamlessClone(face, orgFace, null, center, m, SeamlessCloneMethods.NormalClone);
+                Cv2.ImShow("miss", m);
+                Cv2.WaitKey(1);
+                //orgFace.CopyTo(face, missingMask);
 
 
 
-                var orgMat = mat.Clone();
-
-                maskCenter.X -= faceRect.X;
-                maskCenter.Y -= faceRect.Y;
-
-                var circleMask = new Mat(mask.Size(), MatType.CV_8U, new Scalar(255));
-                Cv2.Circle(circleMask, maskCenter, (int)(wMat.Width/2.0f), Scalar.Black,-1);
+                m.CopyTo(orgFace);
 
 
-
-                var missingMask = new Mat(mat.Size(), MatType.CV_8U, new Scalar(255));
-                var negMask = new Mat();
-                Cv2.BitwiseNot(mask, negMask);
-                negMask.CopyTo(new Mat(missingMask, faceRect));
 
                 //copy face
                 if (!seamlessClone)
                 {
-                    wMat.CopyTo(new Mat(mat, faceRect), mask);
+                    face.CopyTo(new Mat(mat, faceRect));
                 }
-
-                // Cv2.ImShow("c", corners);
-                // Cv2.WaitKey();
-
-                //Cv2.Circle(mat, maskCenter, 5, Scalar.Red);
-                //wMat.CopyTo(new Mat(mat, selectedRect), ~circleMask);
-                // var ttt = new Mat();
-                // wMat.CopyTo(ttt, ~circleMask);
-                // Cv2.ImShow("sss", ttt);
-                // Cv2.WaitKey();
 
                 try
                 {
                     if (seamlessClone)
                     {
-                        Cv2.SeamlessClone(wMat, mat, null, center, mat, SeamlessCloneMethods.NormalClone);
+                 
+                        //Cv2.SeamlessClone(face, mat, null, center, mat, SeamlessCloneMethods.NormalClone);
                     }
                 }
                 catch (OpenCVException e)
@@ -253,17 +237,14 @@ namespace Test
                     continue;
                 }
 
-                //copy missing part
-                orgMat.CopyTo(mat, missingMask);
-
                 prevOutput = modelOut;
 
 
-                var orgPreviewRect = new Rect(0, 0, orgFace.Width, orgFace.Height);
-                orgFace.CopyTo(new Mat(mat, orgPreviewRect));
+                var orgPreviewRect = new Rect(0, 0, orgFaceCpy.Width, orgFaceCpy.Height);
+                orgFaceCpy.CopyTo(new Mat(mat, orgPreviewRect));
                 orgPreviewRect.Y += orgPreviewRect.Height;
 
-                wMat.CopyTo(new Mat(mat, orgPreviewRect));
+                face.CopyTo(new Mat(mat, orgPreviewRect));
 
                 Cv2.ImShow("frame", mat);
                 Cv2.WaitKey(5);

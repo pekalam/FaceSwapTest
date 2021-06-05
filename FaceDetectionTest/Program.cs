@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading;
 using Common;
+using FaceRecognitionDotNet;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
@@ -9,6 +10,37 @@ using OpenCvSharp;
 using static Common.Utils;
 
 //PythonInit.Init();
+
+var recog = FaceRecognition.Create(new FaceRecognitionModelSettings().Location);
+var hc = new HcFaceDetection(new HcFaceDetectionSettings());
+var imgp = @"D:\Workspace\FaceSwapDataset\novak\frames\training\0.jpeg";
+var img = Cv2.ImRead(imgp);
+
+var rects = hc.DetectFrontalThenProfileFaces(img);
+var masked = MaskUtils.GetMasked(img, recog.FaceLandmark(LoadImage(img)).First());
+masked = new Mat(masked, rects[0]);
+
+var missingMask = Mat.Zeros(masked.Size(), MatType.CV_8U).ToMat();
+
+// Cv2.InRange(masked, new Scalar(0, 0, 0), new Scalar(0, 0, 0), missingMask);
+
+var gray = new Mat();
+Cv2.CvtColor(masked, gray, ColorConversionCodes.BGR2GRAY);
+var thresh = new Mat();
+Cv2.Threshold(gray, thresh, 0, 255, ThresholdTypes.BinaryInv);
+
+Cv2.GaussianBlur(thresh, thresh, new Size(5,5), 11.0);
+
+Cv2.ImShow("asdasd",thresh);
+Cv2.WaitKey();
+
+var imgp2 = @"D:\Workspace\FaceSwapDataset\serena\frames\training\0.jpeg";
+var img2 = Cv2.ImRead(imgp2);
+
+new Mat(img2, rects[0]).CopyTo(masked, thresh);
+
+Cv2.ImShow("asdasd", masked);
+Cv2.WaitKey();
 
 var videoPath = @"D:\serena.mp4";
 var capServcie = new CaptureService(filePath: videoPath);
