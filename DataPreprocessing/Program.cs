@@ -212,8 +212,8 @@ namespace DataPreprocessing
                     int freq = Prompt.Input<int>("Enter freq");
 
                     var extractFrames = new FrameExtractStep();
-                    extractFrames.Execute(@"D:\nole.mp4", P1Dir,freq, 0.2);
-                    extractFrames.Execute(@"D:\serena.mp4", P2Dir,freq, 0.2);
+                    extractFrames.Execute(@"D:\WIN10_SSDSamsung\nole.mp4", P1Dir,freq, 0.2);
+                    extractFrames.Execute(@"D:\WIN10_SSDSamsung\serena.mp4", P2Dir,freq, 0.2);
                     Console.WriteLine("Completed");
                 }
 

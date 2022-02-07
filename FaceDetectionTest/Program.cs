@@ -42,7 +42,7 @@ using static Common.Utils;
 // Cv2.ImShow("asdasd", masked);
 // Cv2.WaitKey();
 
-var videoPath = @"D:\serena.mp4";
+var videoPath = @"D:\nole.mp4";
 var capServcie = new CaptureService(filePath: videoPath);
 var to = capServcie.TotalFrames;
 AccurateFaceDetection accFaceDetection = null;
@@ -57,6 +57,7 @@ while (true)
     frameCount++;
 
     var t = en.MoveNextAsync();
+
     t.AsTask().GetAwaiter().GetResult();
     using var mat = en.Current;
 

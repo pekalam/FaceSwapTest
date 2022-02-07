@@ -162,7 +162,7 @@ namespace Common
             {
                 topCandidates = topCandidates.Where(c => IntersectWith(c.Rect, _attractingRoi.Value)).ToArray();
             }
-
+            
             if (_totalProcessed > 0 && biggerArea)
             {
                 _logger.LogDebug("Selecting another rect due to bigger area value");
@@ -180,6 +180,11 @@ namespace Common
             }
 
             return selected;
+        }
+
+        private double Euclidean(Point p1, Point p2)
+        {
+            return Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
         }
 
         private FaceDetectionOutput? DetectFacesFromRects(Mat image, Image dnImage, Rect[] rects)
@@ -256,6 +261,14 @@ namespace Common
             {
                 return null;
             }
+
+            // if (_prevOutput != null && Euclidean(
+            //     new Point(selected.Rect.X + selected.Rect.Width / 2, selected.Rect.Y + selected.Rect.Height / 2),
+            //     new Point(_prevOutput.faceRect.X + _prevOutput.faceRect.Width / 2,
+            //         _prevOutput.faceRect.Y + _prevOutput.faceRect.Height / 2)) < 20)
+            // {
+            //     selected = new TopCandidates(_prevOutput.faceRect, selected.Landmarks);
+            // }
 
             var output = new FaceDetectionOutput(selected.Rect, GetFaceCoords(selected.Landmarks), selected.Landmarks);
             return output;

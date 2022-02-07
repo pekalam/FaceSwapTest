@@ -53,7 +53,6 @@ namespace Common
         public async IAsyncEnumerable<Mat> CaptureFrames([EnumeratorCancellation] CancellationToken ct)
         {
             _isCapturing = true;
-
             while (!ct.IsCancellationRequested)
             {
                 //todo
@@ -66,12 +65,17 @@ namespace Common
                     break;
                 }
                 var frame = cap.RetrieveMat();
-                if (frame != null)
+                if (frame != null && !frame.Empty())
                 {
                     ValidateMat(frame);
                     yield return frame;
                 }
+                else
+                {
+                    break;
+                }
             }
+
 
             cap.Release();
             _isCapturing = false;
